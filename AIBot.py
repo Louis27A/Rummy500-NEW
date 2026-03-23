@@ -119,6 +119,149 @@ class AIBot(Player):
 
         return None
 
+    def decide_insert_card(self, plays_in_table):
+        """
+        Decides which card to insert into existing plays.
+        This is a key strategy: inserting cards reduces hand size without initial play.
+        Returns (play_index, card_to_insert, position) or None
+        """
+        if not self.downHand:
+            return None
+
+        best_insertion = None
+        best_score = -1
+
+        for play_idx, play in enumerate(plays_in_table):
+            for card in self.playerHand:
+                insertion_result = self._try_insert_card(card, play)
+                if insertion_result:
+                    position = insertion_result
+                    insertion_score = self._score_insertion(card, play, play_idx)
+
+                    if insertion_score > best_score:
+                        best_score = insertion_score
+                        best_insertion = (play_idx, card, position)
+
+        return best_insertion
+
+    def _try_insert_card(self, card, play):
+        """
+        Tries to insert a card into a play.
+        Returns the position where it can be inserted, or None if impossible.
+
+        Validates:
+        - Card can extend a sequence
+        - Card value matches a trio
+        - Joker can be substituted for a trio card
+        """
+        play_type = self._get_play_type(play)
+
+        if play_type == 'sequence':
+            return self._can_insert_into_sequence(card, play)
+        elif play_type == 'trio':
+            return self._can_insert_into_trio(card, play)
+
+        return None
+
+    def _can_insert_into_sequence(self, card, sequence):
+        """
+        Checks if a card can be inserted into a sequence.
+        Sequences can be extended at the ends if the card is consecutive.
+        Returns the position (0 for start, len for end) or None.
+        """
+        if card.joker:
+            return None
+
+        card_values = Card.values
+        card_idx = card_values.index(card.value) if card.value in card_values else -1
+
+        if card_idx == -1 or card.suit != sequence[0].suit:
+            return None
+
+        sequence_indices = []
+        for seq_card in sequence:
+            if not seq_card.joker:
+                idx = card_values.index(seq_card.value) if seq_card.value in card_values else -1
+                if idx != -1:
+                    sequence_indices.append(idx)
+
+        if not sequence_indices:
+            return None
+
+        min_idx = min(sequence_indices)
+        max_idx = max(sequence_indices)
+
+        if card_idx == min_idx - 1:
+            return 0
+        elif card_idx == max_idx + 1:
+            return len(sequence)
+
+        return None
+
+    def _can_insert_into_trio(self, card, trio):
+        """
+        Checks if a card can be inserted into a trio.
+        Trios accept cards with the same value (max 1 joker per trio).
+        Returns position 0 (always append for trios) or None.
+        """
+        if not trio or len(trio) < 3:
+            return None
+
+        trio_value = trio[0].value
+
+        if card.value == trio_value:
+            joker_count = sum(1 for c in trio if c.joker)
+            if not card.joker and joker_count <= 1:
+                return 0
+
+        if card.joker and not any(c.joker for c in trio):
+            return 0
+
+        return None
+
+    def _get_play_type(self, play):
+        """
+        Determines if a play is a sequence or trio.
+        """
+        if not play or len(play) < 3:
+            return None
+
+        first_card = play[0]
+
+        suits = set(c.suit for c in play if not c.joker)
+        if len(suits) == 1:
+            return 'sequence'
+
+        values = set(c.value for c in play if not c.joker)
+        if len(values) == 1:
+            return 'trio'
+
+        return 'mixed'
+
+    def _score_insertion(self, card, play, play_idx):
+        """
+        Scores how good an insertion would be.
+        Higher score = better insertion.
+        """
+        score = 0.0
+
+        card_points = self._get_card_point_value(card)
+        score += (25 - card_points) / 25
+
+        remaining_hand = [c for c in self.playerHand if c != card]
+        remaining_points = sum(self._get_card_point_value(c) for c in remaining_hand)
+
+        if remaining_points < 50:
+            score += 0.5
+
+        play_type = self._get_play_type(play)
+        if play_type == 'sequence':
+            score += 0.3
+        elif play_type == 'trio':
+            score += 0.2
+
+        return score
+
     def _find_valid_plays(self, round_number):
         """
         Finds all valid plays possible with current hand.

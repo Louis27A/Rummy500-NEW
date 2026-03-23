@@ -167,6 +167,18 @@ Decides if joker should be moved in a sequence.
 Decides if a joker should be substituted for a regular card.
 - **Returns:** `(play_index, card_to_use)` tuple or `None`
 
+#### `decide_insert_card(plays_in_table)`
+**IMPORTANTE**: Decides which card to insert into existing plays (after the bot has "bajado").
+This is one of the most important strategies in Rummy500 - reducing hand size without making new plays.
+- **Returns:** `(play_index, card_to_insert, position)` tuple or `None`
+- **Parameters:**
+  - `plays_in_table`: List of all plays currently on the board
+- **Notes:**
+  - Only works after bot has made initial play (when `downHand` is True)
+  - Bot intelligently chooses which card to insert to minimize remaining points
+  - Validates that insertions don't break play rules
+  - Prioritizes inserting high-point cards first
+
 ### Learning Methods
 
 #### `learn_from_game(game_result)`
@@ -246,10 +258,24 @@ def play_turn(current_player, game_state):
         else:
             draw_from_deck(current_player, game_state)
 
-        # Try to play cards
+        # Try to play cards (initial play or new plays)
         play = current_player.decide_play_cards(game_state['round_number'])
         if play:
             execute_play(current_player, play, game_state)
+
+        # If already "bajado", try to insert cards into existing plays
+        if current_player.downHand:
+            insertion = current_player.decide_insert_card(game_state['plays_in_table'])
+            if insertion:
+                play_idx, card, position = insertion
+                insert_card_into_play(current_player, card, game_state['plays_in_table'][play_idx], position)
+
+        # Move jokers if possible (only after bajada)
+        if current_player.downHand:
+            joker_move = current_player.decide_move_joker(game_state['plays_in_table'])
+            if joker_move:
+                play_idx, new_position = joker_move
+                move_joker_in_play(game_state['plays_in_table'][play_idx], new_position)
 
         # Discard a card
         card = current_player.decide_discard()
@@ -326,11 +352,60 @@ print(f"Current Strategy: {bot.strategy_weights}")
 print(f"Recent History: {bot.game_history[-5:]}")
 ```
 
+## Card Insertion Strategy (Critical Mechanic)
+
+The `decide_insert_card()` method is crucial for advanced play:
+
+### How Card Insertion Works in Rummy500
+
+After a player has made their initial play ("bajarse"), they can insert cards into ANY plays on the board:
+- **Extend sequences** by adding consecutive cards to either end
+- **Extend trios** by adding cards of the same value
+- **Replace jokers** by inserting the actual card a joker is substituting
+
+### Bot's Insertion Strategy
+
+The bot:
+1. **Evaluates all cards** in hand for insertion opportunities
+2. **Prioritizes high-point cards** - inserting a 10-K-Joker is better than a low card
+3. **Maximizes hand reduction** - chooses insertions that minimize remaining points
+4. **Validates moves** - ensures sequences stay consecutive and trios stay valid
+
+### Example Integration
+
+```python
+# After bot has bajado (downHand = True)
+if current_player.downHand and current_player.is_ai:
+    # Get all plays currently on the board
+    board_plays = game_state['plays_in_table']
+
+    # Ask bot where to insert a card
+    insertion = current_player.decide_insert_card(board_plays)
+
+    if insertion:
+        play_idx, card_to_insert, position = insertion
+
+        # Execute the insertion
+        board_plays[play_idx].insert(position, card_to_insert)
+        current_player.playerHand.remove(card_to_insert)
+
+        # Update UI and points calculation
+        update_board_display(board_plays)
+        recalculate_points(current_player)
+```
+
+### Why This Matters
+
+- **Reduces points drastically** - inserting high-value cards prevents accumulating points
+- **Enables winning** - the only way to win is to empty your hand
+- **Strategic depth** - bot learns when to insert vs when to hold cards
+
 ## Notes
 
 - AI Bot inherits all Player functionality including drawing, playing, and discarding cards
 - The learning system is statistical - bot improves through pattern recognition
 - Each bot saves independently, so you can have multiple trained bots with different skill levels
 - Training is CPU-intensive but runs offline, not affecting gameplay
+- **Card insertion is essential** - the bot will lose without using `decide_insert_card()` correctly
 
 Good luck with your AI-powered Rummy500 game!

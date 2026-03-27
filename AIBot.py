@@ -175,7 +175,7 @@ class AIBot(Player):
         card_values = Card.values
         card_idx = card_values.index(card.value) if card.value in card_values else -1
 
-        if card_idx == -1 or card.suit != sequence[0].suit:
+        if card_idx == -1 or card.type != sequence[0].type:
             return None
 
         sequence_indices = []
@@ -308,14 +308,14 @@ class AIBot(Player):
         Finds all valid sequences in current hand.
         """
         sequences = []
-        suit_groups = {}
+        type_groups = {}
 
         for card in self.playerHand:
-            if card.suit not in suit_groups:
-                suit_groups[card.suit] = []
-            suit_groups[card.suit].append(card)
+            if card.type not in type_groups:
+                type_groups[card.type] = []
+            type_groups[card.type].append(card)
 
-        for suit, cards in suit_groups.items():
+        for card_type, cards in type_groups.items():
             valid_sequences = self._find_sequences_in_suit(cards)
             sequences.extend(valid_sequences)
 
@@ -401,21 +401,45 @@ class AIBot(Player):
     def _combine_plays(self, trios, sequences, min_trios=0, min_sequences=0, use_all=False):
         """
         Combines trios and sequences into valid play combinations.
+        CRITICAL: Validates that no card is used in multiple plays (no duplicates).
         """
         valid_combinations = []
 
         if use_all:
             for trio_combo in trios:
                 for seq_combo in sequences:
-                    if len([c for trio in trio_combo for c in trio]) + len([c for seq in seq_combo for c in seq]) == len(self.playerHand):
-                        valid_combinations.append((trio_combo, seq_combo))
+                    if self._plays_share_no_cards(trio_combo, seq_combo):
+                        all_cards = [c for trio in trio_combo for c in trio] + [c for seq in seq_combo for c in seq]
+                        if len(all_cards) == len(self.playerHand):
+                            valid_combinations.append((trio_combo, seq_combo))
         else:
             for trio_combo in trios:
                 for seq_combo in sequences:
                     if len(trio_combo) >= min_trios and len(seq_combo) >= min_sequences:
-                        valid_combinations.append((trio_combo, seq_combo))
+                        if self._plays_share_no_cards(trio_combo, seq_combo):
+                            valid_combinations.append((trio_combo, seq_combo))
 
         return valid_combinations
+
+    def _plays_share_no_cards(self, trios, sequences):
+        """
+        Validates that no card is used in both trios and sequences.
+        This prevents the same card (or Joker) from being used twice.
+        Returns True if plays don't share any cards, False otherwise.
+        """
+        trio_cards = []
+        for trio in trios:
+            trio_cards.extend(trio)
+
+        sequence_cards = []
+        for sequence in sequences:
+            sequence_cards.extend(sequence)
+
+        for card in trio_cards:
+            if card in sequence_cards:
+                return False
+
+        return True
 
     def _select_best_play(self, valid_plays, round_number):
         """

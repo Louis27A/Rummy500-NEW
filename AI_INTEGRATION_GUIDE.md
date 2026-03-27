@@ -172,12 +172,41 @@ Decides if a joker should be substituted for a regular card.
 This is one of the most important strategies in Rummy500 - reducing hand size without making new plays.
 - **Returns:** `(play_index, card_to_insert, position)` tuple or `None`
 - **Parameters:**
-  - `plays_in_table`: List of all plays currently on the board
+  - `plays_in_table`: List of plays currently on the board. Format explained below.
 - **Notes:**
   - Only works after bot has made initial play (when `downHand` is True)
   - Bot intelligently chooses which card to insert to minimize remaining points
   - Validates that insertions don't break play rules
   - Prioritizes inserting high-point cards first
+
+##### Understanding `plays_in_table` Parameter
+
+The `plays_in_table` parameter should be a **list of plays**, where each play is a **list of Card objects**.
+
+**Structure:**
+```python
+plays_in_table = [
+    [Card('5', 'Hearts'), Card('5', 'Spades'), Card('5', 'Diamonds')],  # Trio
+    [Card('9', 'Clubs'), Card('10', 'Clubs'), Card('J', 'Clubs'), Card('Q', 'Clubs')],  # Sequence
+    [Card('2', 'Spades'), Card('3', 'Spades'), Card('4', 'Spades'), Card('5', 'Spades'), Card('6', 'Spades')]  # Another sequence
+]
+```
+
+**Example with Jokers:**
+```python
+plays_in_table = [
+    [Card('K', 'Hearts'), Card('K', 'Diamonds'), Card('Joker', 'Joker')],  # Trio with Joker
+    [Card('3', 'Clubs'), Card('4', 'Clubs'), Card('Joker', 'Joker'), Card('6', 'Clubs')]  # Sequence with Joker
+]
+```
+
+**Key Points:**
+- Each inner list represents ONE play (either a trio or a sequence)
+- Each play contains Card objects, NOT strings
+- Card objects must have: `value`, `suit`, and `joker` properties
+- For Jokers: `Card('Joker', 'Joker')` with `joker=True` attribute
+- The bot will try to insert into ANY play on the board
+- Returns `None` if no beneficial insertion is found
 
 ### Learning Methods
 

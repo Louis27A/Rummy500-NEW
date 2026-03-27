@@ -283,6 +283,95 @@ python train_bot.py --games 100
 - For competitive play: Train periodically (weekly)
 - Before major releases: Retrain with 1000+ games
 
+## Card Duplication & Play Validation
+
+### Q: What happens if the bot tries to use the same card twice?
+**A:** The bot now validates this! It will NOT create plays that use the same card in multiple plays.
+
+Example - BOT REJECTS this:
+```python
+# INVALID - Joker used twice
+Trios: [['Q♠', 'Joker', 'Q♦']]
+Sequences: [['9♣', '10♣', 'J♣', 'Joker', 'K♣']]  # Can't use Joker twice!
+```
+
+Example - BOT ACCEPTS this:
+```python
+# VALID - Each card used exactly once
+Trios: [['Q♠', 'Q♣', 'Q♦']]
+Sequences: [['9♣', '10♣', 'J♣', 'K♣']]  # No Joker needed
+```
+
+### Q: How does the bot prevent duplicate cards?
+**A:** The `_plays_share_no_cards()` method validates that:
+1. No card appears in both a trio AND a sequence
+2. No card (including Joker) is used twice
+3. All cards in the play are from the bot's actual hand
+
+## Understanding `plays_in_table` Parameter
+
+### Q: What format does `decide_insert_card()` expect for `plays_in_table`?
+**A:** It expects a **list of plays**, where each play is a **list of Card objects**.
+
+**Correct Format:**
+```python
+plays_in_table = [
+    [Card('5', 'Hearts'), Card('5', 'Spades'), Card('5', 'Diamonds')],  # Trio
+    [Card('9', 'Clubs'), Card('10', 'Clubs'), Card('J', 'Clubs'), Card('Q', 'Clubs')],  # Sequence
+]
+```
+
+**NOT a tuple, but a LIST of LISTS of CARDS.**
+
+### Q: How do I construct the Card objects for plays_in_table?
+**A:** Each card in the plays must be an actual Card object from the game:
+
+```python
+from Card import Card
+
+# Create Card objects
+card1 = Card('5', 'Hearts')
+card2 = Card('10', 'Clubs')
+joker = Card('Joker', 'Joker')  # Must have joker=True attribute
+
+# Add to plays
+play1 = [card1, card2, joker]
+plays_in_table = [play1]
+
+# Pass to bot
+insertion = bot.decide_insert_card(plays_in_table)
+```
+
+### Q: What if a play has a Joker?
+**A:** Include it like any other card:
+
+```python
+plays_in_table = [
+    [Card('K', 'Hearts'), Card('K', 'Diamonds'), Card('Joker', 'Joker')],  # Valid trio with Joker
+    [Card('3', 'Clubs'), Card('Joker', 'Joker'), Card('5', 'Clubs')]  # Valid sequence with Joker
+]
+```
+
+The bot automatically handles Joker insertion logic.
+
+### Q: Can plays_in_table be empty?
+**A:** Yes, but the bot will return None (no insertions possible):
+
+```python
+plays_in_table = []  # Empty board
+insertion = bot.decide_insert_card(plays_in_table)  # Returns None
+```
+
+### Q: What if a play has only 2 cards?
+**A:** The bot won't insert into plays with < 3 cards (invalid plays):
+
+```python
+# This play will be ignored (invalid)
+plays_in_table = [
+    [Card('5', 'Hearts'), Card('5', 'Spades')]  # Too short, bot ignores
+]
+```
+
 ## Still Have Questions?
 
 Check these files for more info:

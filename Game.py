@@ -446,9 +446,9 @@ def mainGameLoop(screen, playersInOrder):
                                 current_player.playMade.append(trio1)
                                 current_player.playMade.append(trio2)
                                 current_player.playMade.append(trio3)
-                                plays_in_table.append(trio1) 
-                                plays_in_table(trio2) 
-                                plays_in_table(trio3)
+                                plays_in_table.append(trio1)
+                                plays_in_table.append(trio2)
+                                plays_in_table.append(trio3)
                                 
                                 print(f"EL JUGADOR {current_player.playerName} SE BAJÓ CON LAS SIGUIENTES JUGADAS: {[[str(c) for c in play] for play in current_player.playMade]}")
                                 current_player.downHand = True
@@ -492,9 +492,9 @@ def mainGameLoop(screen, playersInOrder):
                                     current_player.playMade.append(trio1)
                                     current_player.playMade.append(trio2)
                                     current_player.playMade.append(sortedStraights)
-                                    plays_in_table.append(trio1) 
-                                    plays_in_table(trio2) 
-                                    plays_in_table(sortedStraights) 
+                                    plays_in_table.append(trio1)
+                                    plays_in_table.append(trio2)
+                                    plays_in_table.append(sortedStraights) 
                                     
                                     print(f"EL JUGADOR {current_player.playerName} SE BAJÓ CON LAS SIGUIENTES JUGADAS: {[[str(c) for c in play] for play in current_player.playMade]}")
                                     current_player.downHand = True

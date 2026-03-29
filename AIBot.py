@@ -228,7 +228,7 @@ class AIBot(Player):
 
         first_card = play[0]
 
-        suits = set(c.suit for c in play if not c.joker)
+        suits = set(c.type for c in play if not c.joker)
         if len(suits) == 1:
             return 'sequence'
 
@@ -323,31 +323,36 @@ class AIBot(Player):
 
     def _get_valid_trio_combinations(self, cards):
         """
-        Returns valid trio combinations (3+ cards with same value, max 1 joker).
+        Returns valid trio combinations (3+ cards with same value, max 2 jokers total).
+        Jokers can replace missing cards to complete trios.
         """
         if len(cards) < 3:
             return []
 
         combinations = []
-        joker_count = sum(1 for c in cards if c.joker)
+        non_joker_cards = [c for c in cards if not c.joker]
+        joker_cards = [c for c in cards if c.joker]
 
-        if joker_count > 1:
-            cards_no_joker = [c for c in cards if not c.joker]
-            if len(cards_no_joker) >= 3:
-                combinations.append(cards_no_joker[:3])
-            if len(cards_no_joker) >= 2:
-                joker = next(c for c in cards if c.joker)
-                combinations.append(cards_no_joker + [joker])
-        else:
-            combinations.append(cards[:3])
-            if len(cards) > 3:
-                combinations.append(cards[:4])
+        if len(non_joker_cards) >= 3:
+            combinations.append(non_joker_cards[:3])
+            if len(non_joker_cards) >= 4:
+                combinations.append(non_joker_cards[:4])
+
+        if len(non_joker_cards) >= 2 and joker_cards:
+            combinations.append(non_joker_cards[:2] + [joker_cards[0]])
+
+        if len(non_joker_cards) >= 1 and len(joker_cards) >= 2:
+            combinations.append([non_joker_cards[0]] + joker_cards[:2])
+
+        if len(joker_cards) >= 3:
+            combinations.append(joker_cards[:3])
 
         return combinations
 
     def _find_sequences_in_suit(self, cards):
         """
         Finds valid sequences (4+ consecutive cards of same suit).
+        Includes sequences using Jokers as wildcards.
         """
         if len(cards) < 4:
             return []
@@ -357,11 +362,20 @@ class AIBot(Player):
 
         sorted_cards = sorted(cards, key=lambda c: card_values.index(c.value) if c.value in card_values else -1)
 
-        for i in range(len(sorted_cards) - 3):
-            for j in range(i + 4, len(sorted_cards) + 1):
-                potential_sequence = sorted_cards[i:j]
+        non_joker_cards = [c for c in sorted_cards if not c.joker]
+        joker_cards = [c for c in sorted_cards if c.joker]
+
+        for i in range(len(non_joker_cards) - 3):
+            for j in range(i + 4, len(non_joker_cards) + 1):
+                potential_sequence = non_joker_cards[i:j]
                 if self._is_valid_sequence(potential_sequence):
                     sequences.append(potential_sequence)
+
+                if joker_cards:
+                    for k in range(1, len(joker_cards) + 1):
+                        extended_sequence = potential_sequence + joker_cards[:k]
+                        if self._is_valid_sequence(extended_sequence):
+                            sequences.append(extended_sequence)
 
         return sequences
 
@@ -483,13 +497,13 @@ class AIBot(Player):
         usefulness = 0.0
 
         card_value = card.value
-        card_suit = card.suit
+        card_type = card.type
 
         matching_value = sum(1 for c in self.playerHand if c.value == card_value and c != card)
         usefulness += min(matching_value / 3, 0.4)
 
-        matching_suit = sum(1 for c in self.playerHand if c.suit == card_suit and c != card)
-        usefulness += min(matching_suit / 4, 0.35)
+        matching_type = sum(1 for c in self.playerHand if c.type == card_type and c != card)
+        usefulness += min(matching_type / 4, 0.35)
 
         if card.joker:
             usefulness += 0.25
@@ -537,8 +551,8 @@ class AIBot(Player):
             matching_value = sum(1 for c in self.playerHand if c.value == card.value and c != card)
             value += matching_value * 0.5
 
-            matching_suit = sum(1 for c in self.playerHand if c.suit == card.suit and c != card)
-            value += matching_suit * 0.3
+            matching_type = sum(1 for c in self.playerHand if c.type == card.type and c != card)
+            value += matching_type * 0.3
 
             point_value = self._get_card_point_value(card)
             value += point_value / 20
